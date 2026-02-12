@@ -26,8 +26,15 @@ const SelectInput = ({
     const [open, setOpen] = useState(false);
     const [inputValue, setInputValue] = useState(value ?? "");
 
+    // Helper function to get the display value (label if it matches an option, otherwise the raw value)
+    const getDisplayValue = (val: string | undefined) => {
+        if (!val) return "";
+        const matchedOption = options.find((option) => option.value === val);
+        return matchedOption ? matchedOption.label : val;
+    };
+
     useEffect(() => {
-        setInputValue(value ?? "");
+        setInputValue(getDisplayValue(value));
     }, [value]);
 
     const filteredOptions = useMemo(() => {
@@ -54,11 +61,12 @@ const SelectInput = ({
         const resolved = resolveOptionValue(raw);
         if (!resolved) {
             if (!allowCustom) {
-                setInputValue(value ?? "");
+                setInputValue(getDisplayValue(value));
             }
             return;
         }
         onChange(resolved);
+        setInputValue(getDisplayValue(resolved));
         setOpen(false);
     };
 
@@ -87,7 +95,7 @@ const SelectInput = ({
                     if (allowCustom) {
                         commitValue(inputValue);
                     } else {
-                        setInputValue(value ?? "");
+                        setInputValue(getDisplayValue(value));
                     }
                 }}
                 onKeyDown={(event) => {
