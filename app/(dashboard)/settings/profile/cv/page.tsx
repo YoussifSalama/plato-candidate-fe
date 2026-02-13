@@ -11,7 +11,7 @@ import { useProfileSectionsStore } from "@/shared/store/pages";
 import { ParsedCVProfile } from "@/shared/store/pages/profile/useProfileStore";
 import { FileText, Download, Trash2 } from "lucide-react";
 import AutofillDialog from "./AutofillDialog";
-import RemoveCVDialog from "./RemoveCVDialog";
+
 
 const FILES_BASE_URL = process.env.NEXT_PUBLIC_FILES_RESUME || "";
 
@@ -58,7 +58,6 @@ const CandidateProfileCVSettingsPage = () => {
     const {
         getCV,
         uploadCV,
-        deleteCV,
         savingCV,
         cv,
         loadingCV,
@@ -68,7 +67,7 @@ const CandidateProfileCVSettingsPage = () => {
     } = useProfileSectionsStore();
     const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
     const [isAutofillOpen, setIsAutofillOpen] = useState(false);
-    const [isRemoveOpen, setIsRemoveOpen] = useState(false);
+
     const [parsedData, setParsedData] = useState<ParsedCVProfile | null>(null);
 
     const {
@@ -174,12 +173,7 @@ const CandidateProfileCVSettingsPage = () => {
         // Don't call getCV() here - CV state is already set from upload
     };
 
-    const handleRemoveCV = async (autoClear: boolean) => {
-        const success = await deleteCV(autoClear);
-        if (success) {
-            setIsRemoveOpen(false);
-        }
-    };
+
 
     return (
         <div className="rounded-md border border-blue-200 bg-white p-6 shadow-sm shadow-blue-200/40 dark:border-slate-700/60 dark:bg-slate-900 dark:shadow-none">
@@ -189,12 +183,7 @@ const CandidateProfileCVSettingsPage = () => {
                 onConfirm={handleAutofill}
                 parsedData={parsedData}
             />
-            <RemoveCVDialog
-                open={isRemoveOpen}
-                onOpenChange={setIsRemoveOpen}
-                onConfirm={handleRemoveCV}
-                isRemoving={savingCV}
-            />
+
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
@@ -237,26 +226,17 @@ const CandidateProfileCVSettingsPage = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <a
-                                        href={resolveFileUrl(cv.url) ?? ""}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                                    >
-                                        <Download size={16} />
-                                        Download
-                                    </a>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setIsRemoveOpen(true)}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
-                                    >
-                                        <Trash2 size={16} />
-                                        Remove
-                                    </Button>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={resolveFileUrl(cv.url) ?? ""}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                >
+                                    <Download size={16} />
+                                    Download
+                                </a>
                             </div>
                         </div>
                     )}

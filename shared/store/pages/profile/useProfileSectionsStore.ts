@@ -51,7 +51,7 @@ type ProfileSectionsState = {
     replaceSocialLinks: (links: ProfileSocialLink[]) => Promise<boolean>;
     uploadAvatar: (file: File) => Promise<boolean>;
     uploadCV: (file: File) => Promise<ParsedCVProfile | null>;
-    deleteCV: (autoClear?: boolean) => Promise<boolean>;
+
 };
 
 const getToken = (accessToken?: string | null) => {
@@ -284,7 +284,7 @@ export const useProfileSectionsStore = create<ProfileSectionsState>((set) => ({
         try {
             const formData = new FormData();
             formData.append("file", file);
-            const response = await apiClient.post("/candidate/resume", formData, {
+            const response = await apiClient.patch("/candidate/resume", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             const data = response.data?.data ?? response.data;
@@ -320,30 +320,6 @@ export const useProfileSectionsStore = create<ProfileSectionsState>((set) => ({
             set({ savingCV: false });
         }
     },
-    deleteCV: async (autoClear = false) => {
-        set({ savingCV: true });
-        try {
-            await apiClient.delete("/candidate/resume");
 
-            // Update local state
-            set({ cv: null });
-
-            // Auto-clear profile data if requested
-            if (autoClear) {
-                const state = useProfileSectionsStore.getState();
-                await state.updateBasic({ headline: "", summary: "", location: "" });
-                await state.replaceExperiences([]);
-                await state.replaceProjects([]);
-            }
-
-            toast.success("CV removed successfully.");
-            return true;
-        } catch (error: unknown) {
-            toast.error(getErrorMessage(error, "Failed to remove CV."));
-            return false;
-        } finally {
-            set({ savingCV: false });
-        }
-    },
 }));
 
