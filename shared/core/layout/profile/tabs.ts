@@ -1,5 +1,6 @@
 import {
     BriefcaseBusiness,
+    FileText,
     FolderKanban,
     Image,
     Link2,
@@ -32,6 +33,11 @@ export const profileTabs: ITab[] = [
         label: "Avatar",
         href: "/settings/profile/avatar",
         icon: Image,
+    },
+    {
+        label: "CV",
+        href: "/settings/profile/cv",
+        icon: FileText,
     },
 ];
 

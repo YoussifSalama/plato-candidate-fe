@@ -11,6 +11,7 @@ import type {
     ProfileExperience,
     ProfileProject,
     ProfileSocialLink,
+    ParsedCVProfile,
 } from "./useProfileStore";
 
 type ProfileBasic = {
@@ -25,26 +26,32 @@ type ProfileSectionsState = {
     projects: ProfileProject[];
     socialLinks: ProfileSocialLink[];
     avatar: string | null;
+    cv: { url: string | null; name: string | null } | null;
     loadingBasic: boolean;
     loadingExperiences: boolean;
     loadingProjects: boolean;
     loadingSocialLinks: boolean;
     loadingAvatar: boolean;
+    loadingCV: boolean;
     savingBasic: boolean;
     savingExperiences: boolean;
     savingProjects: boolean;
     savingSocialLinks: boolean;
     savingAvatar: boolean;
+    savingCV: boolean;
     getBasicProfile: (accessToken?: string | null) => Promise<ProfileBasic | null>;
     getExperiences: (accessToken?: string | null) => Promise<ProfileExperience[]>;
     getProjects: (accessToken?: string | null) => Promise<ProfileProject[]>;
     getSocialLinks: (accessToken?: string | null) => Promise<ProfileSocialLink[]>;
     getAvatar: (accessToken?: string | null) => Promise<string | null>;
+    getCV: (accessToken?: string | null) => Promise<{ url: string | null; name: string | null } | null>;
     updateBasic: (payload: Partial<ProfileBasic>) => Promise<boolean>;
     replaceExperiences: (experiences: ProfileExperience[]) => Promise<boolean>;
     replaceProjects: (projects: ProfileProject[]) => Promise<boolean>;
     replaceSocialLinks: (links: ProfileSocialLink[]) => Promise<boolean>;
     uploadAvatar: (file: File) => Promise<boolean>;
+    uploadCV: (file: File) => Promise<ParsedCVProfile | null>;
+    deleteCV: (autoClear?: boolean) => Promise<boolean>;
 };
 
 const getToken = (accessToken?: string | null) => {
@@ -75,16 +82,19 @@ export const useProfileSectionsStore = create<ProfileSectionsState>((set) => ({
     projects: [],
     socialLinks: [],
     avatar: null,
+    cv: null,
     loadingBasic: false,
     loadingExperiences: false,
     loadingProjects: false,
     loadingSocialLinks: false,
     loadingAvatar: false,
+    loadingCV: false,
     savingBasic: false,
     savingExperiences: false,
     savingProjects: false,
     savingSocialLinks: false,
     savingAvatar: false,
+    savingCV: false,
     getBasicProfile: async (accessToken) => {
         set({ loadingBasic: true });
         try {
@@ -161,6 +171,27 @@ export const useProfileSectionsStore = create<ProfileSectionsState>((set) => ({
             return null;
         } finally {
             set({ loadingAvatar: false });
+        }
+    },
+    getCV: async (accessToken) => {
+        set({ loadingCV: true });
+        try {
+            const token = getToken(accessToken);
+            const response = await apiClient.get("/candidate/resume", {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            const data = response.data?.data ?? response.data;
+            const cv =
+                data?.cv_url || data?.cv_name
+                    ? { url: data.cv_url ?? null, name: data.cv_name ?? null }
+                    : null;
+            set({ cv });
+            return cv;
+        } catch {
+            set({ cv: null });
+            return null;
+        } finally {
+            set({ loadingCV: false });
         }
     },
     updateBasic: async (payload) => {
@@ -246,6 +277,72 @@ export const useProfileSectionsStore = create<ProfileSectionsState>((set) => ({
             return false;
         } finally {
             set({ savingAvatar: false });
+        }
+    },
+    uploadCV: async (file) => {
+        set({ savingCV: true });
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const response = await apiClient.post("/candidate/resume", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const data = response.data?.data ?? response.data;
+
+            // Check if response includes cv_url and cv_name
+            const cvUrl = data?.cv_url || data?.resume_url || null;
+            const cvName = data?.cv_name || data?.resume_name || file.name;
+
+            // Update CV state immediately if we have the info
+            if (cvUrl || cvName) {
+                set({ cv: { url: cvUrl, name: cvName } });
+            } else {
+                // Fallback: refetch profile to get CV info
+                try {
+                    const profile = await fetchProfile();
+                    const cv =
+                        profile?.cv_url || profile?.cv_name
+                            ? { url: profile.cv_url ?? null, name: profile.cv_name ?? null }
+                            : null;
+                    set({ cv });
+                } catch {
+                    // If refetch fails, set a placeholder with the filename
+                    set({ cv: { url: null, name: file.name } });
+                }
+            }
+
+            toast.success(response.data?.message ?? "CV uploaded and parsed.");
+            return data as ParsedCVProfile;
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, "Failed to upload CV."));
+            return null;
+        } finally {
+            set({ savingCV: false });
+        }
+    },
+    deleteCV: async (autoClear = false) => {
+        set({ savingCV: true });
+        try {
+            await apiClient.delete("/candidate/resume");
+
+            // Update local state
+            set({ cv: null });
+
+            // Auto-clear profile data if requested
+            if (autoClear) {
+                const state = useProfileSectionsStore.getState();
+                await state.updateBasic({ headline: "", summary: "", location: "" });
+                await state.replaceExperiences([]);
+                await state.replaceProjects([]);
+            }
+
+            toast.success("CV removed successfully.");
+            return true;
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, "Failed to remove CV."));
+            return false;
+        } finally {
+            set({ savingCV: false });
         }
     },
 }));
