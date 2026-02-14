@@ -1,7 +1,9 @@
 import {
     ClipboardList,
+
     LayoutDashboard,
     Settings,
+    Briefcase,
 } from "lucide-react";
 
 export const sidebarRoutes = [
@@ -14,6 +16,11 @@ export const sidebarRoutes = [
         label: "Interviews",
         href: "/interviews",
         icon: ClipboardList,
+    },
+    {
+        label: "Job Matching",
+        href: "/jobs",
+        icon: Briefcase,
     },
     {
         label: "Settings",
