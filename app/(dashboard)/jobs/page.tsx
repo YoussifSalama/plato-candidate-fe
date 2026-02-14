@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/lib/apiClient";
 import { JobCard } from "@/shared/components/jobs/JobCard";
-import { ArrowRight, ArrowUpDown, Briefcase, FileText, Loader2, RefreshCw } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Briefcase, FileText, Loader2, RefreshCw, X } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useProfileSectionsStore } from "@/shared/store/pages";
@@ -40,6 +40,9 @@ const JobMatchingPage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [sortBy, setSortBy] = useState<SortOption>("match_score");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+    const [newJobsCount, setNewJobsCount] = useState<number>(0);
+    const [showNewJobsBanner, setShowNewJobsBanner] = useState(false);
+    const [pendingJobs, setPendingJobs] = useState<Job[] | null>(null);
 
     // CV Check
     const { getCV, cv, loadingCV } = useProfileSectionsStore();
@@ -59,25 +62,66 @@ const JobMatchingPage = () => {
             const matchedData = matchedResponse.data;
             const matchedJobs = Array.isArray(matchedData) ? matchedData : [];
 
-            if (matchedJobs.length > 0) {
-                setJobs(matchedJobs);
-                return;
-            }
+            // Show cached data immediately
+            setJobs(matchedJobs);
+            setLoading(false);
 
-            // If empty, fall back to computing matches
-            const matchResponse = await apiClient.get("/candidate/jobs/match");
-            const matchData = matchResponse.data;
-            setJobs(Array.isArray(matchData) ? matchData : []);
+            // DISABLED: Automatic background refresh is disabled because /match/refresh endpoint is failing
+            // This prevents scores from changing on every tab switch
+            // Users can still manually refresh using the "Refresh Matches" button
+
+            /* 
+            // Then trigger background refresh
+            try {
+                let refreshedJobs: Job[] = [];
+
+                try {
+                    // Try the refresh endpoint first
+                    const refreshResponse = await apiClient.post("/candidate/jobs/match/refresh");
+                    const refreshData = refreshResponse.data;
+                    refreshedJobs = Array.isArray(refreshData) ? refreshData : [];
+                } catch (refreshError) {
+                    // If refresh fails (e.g., 500 error), fallback to regular match endpoint
+                    console.warn("Background refresh failed, falling back to /match:", refreshError);
+                    const matchResponse = await apiClient.get("/candidate/jobs/match");
+                    const matchData = matchResponse.data;
+                    refreshedJobs = Array.isArray(matchData) ? matchData : [];
+                }
+
+                // Check if we have new jobs - but DON'T update the list automatically
+                // Compare job IDs to detect truly new jobs (not just score updates)
+                const matchedIds = new Set(matchedJobs.map(job => job.id));
+                const refreshedIds = new Set(refreshedJobs.map(job => job.id));
+
+                // Find jobs that are in refreshed but not in matched (truly new jobs)
+                const newJobIds = refreshedJobs.filter(job => !matchedIds.has(job.id));
+
+                if (newJobIds.length > 0) {
+                    setNewJobsCount(newJobIds.length);
+                    setShowNewJobsBanner(true);
+                    setPendingJobs(refreshedJobs);
+                } else if (refreshedJobs.length !== matchedJobs.length) {
+                    // Count changed but no new IDs - jobs were removed
+                    // Silently update without notification
+                    setPendingJobs(refreshedJobs);
+                }
+                // Note: We ignore score updates for the same jobs to avoid jarring changes
+            } catch (error) {
+                console.error("Failed to fetch jobs in background:", error);
+                // Keep showing cached data even if both endpoints fail
+            }
+            */
         } catch (error) {
             console.error("Failed to fetch jobs:", error);
             setJobs([]);
-        } finally {
             setLoading(false);
         }
     };
 
     const handleRefresh = async () => {
         setRefreshing(true);
+        setShowNewJobsBanner(false);
+        setPendingJobs(null);
         try {
             const response = await apiClient.post("/candidate/jobs/match/refresh");
             const data = response.data;
@@ -87,6 +131,14 @@ const JobMatchingPage = () => {
         } finally {
             setRefreshing(false);
         }
+    };
+
+    const handleViewNewJobs = () => {
+        if (pendingJobs) {
+            setJobs(pendingJobs);
+            setPendingJobs(null);
+        }
+        setShowNewJobsBanner(false);
     };
 
     useEffect(() => {
@@ -156,6 +208,34 @@ const JobMatchingPage = () => {
                     Jobs matched to your profile and preferences.
                 </p>
             </div>
+
+            {showNewJobsBanner && (
+                <button
+                    onClick={handleViewNewJobs}
+                    className="flex w-full items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 p-4 text-left transition-colors hover:bg-green-100 dark:border-green-800 dark:bg-green-900/20 dark:hover:bg-green-900/30"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+                            <span className="text-lg">🎉</span>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                                We found {newJobsCount} new job match{newJobsCount !== 1 ? 'es' : ''} for you!
+                            </p>
+                            <p className="text-xs text-green-700 dark:text-green-300">
+                                Click to view new matches
+                            </p>
+                        </div>
+                    </div>
+                    <X
+                        className="h-4 w-4 text-green-600 dark:text-green-400"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowNewJobsBanner(false);
+                        }}
+                    />
+                </button>
+            )}
 
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
